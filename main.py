@@ -4,6 +4,7 @@ from db_exe import execute_sql_query
 from config import schema_description
 import requests
 import threading
+from langdetect import detect
 from flask import Flask, request, jsonify
 
 # ----------------------
@@ -13,8 +14,11 @@ app = Flask(__name__)
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
 def generate_natural_response(user_question, sql_query, results, temperature=0.3):
-    prompt = f"""
-Eres un asistente amigable que responde en el idioma en el que ingresa la pregunta de forma clara y concisa.
+    detected_lang = detect(user_question)
+
+    if detected_lang == "es":
+        prompt = f"""
+Eres un asistente amigable que responde en español de forma clara y concisa.
 Dado el resultado de una consulta SQL, devuelve una respuesta natural que le diga al usuario lo que encontró.
 
 Pregunta del usuario:
@@ -26,7 +30,23 @@ Consulta SQL generada:
 Resultado de la consulta:
 {results}
 
-Regresa solo una respuesta clara en español, con un tono humano, sin mencionar la consulta SQL.
+Regresa solo una respuesta clara en español, sin mencionar la consulta SQL.
+"""
+    else:
+        prompt = f"""
+You are a friendly assistant who responds clearly and naturally in English.
+Given the result of an SQL query, provide a natural answer that tells the user what was found.
+
+User question:
+{user_question}
+
+Generated SQL query:
+{sql_query}
+
+Query result:
+{results}
+
+Only return a clear response in English, with a human tone, without mentioning SQL or query details.
 """
 
     payload = {
@@ -38,7 +58,7 @@ Regresa solo una respuesta clara en español, con un tono humano, sin mencionar 
     }
 
     try:
-        response = requests.post(OLLAMA_URL, json=payload)
+        response = requests.post("http://localhost:11434/api/generate", json=payload)
         response.raise_for_status()
         return response.json()["response"].strip()
     except Exception as e:
